@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User{
+  id String  @id @default(uuid())
+  email String @unique
+  createdAt DateTime @default(now())
+  wallets Wallet[]
+}
+
+model AssetType {
+  id String @id @default(uuid())
+  name String @unique
+  symbol String
+
+  wallets Wallet[]
+  systemWallet SystemWallet[]
+}
+
+model Wallet {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  assetTypeId   String
+  assetType     AssetType     @relation(fields: [assetTypeId], references: [id])
+  cachedBalance BigInt        @default(0)
+  createdAt     DateTime      @default(now())
+  ledgerEntries LedgerEntry[]
+
+  @@unique([userId, assetTypeId], name: "user_asset_wallet")
+  @@index([userId])
+}
+
+model SystemWallet {
+  id            String        @id @default(uuid())
+  assetTypeId   String
+  assetType     AssetType     @relation(fields: [assetTypeId], references: [id])
+  walletType    SystemWalletType
+  cachedBalance BigInt        @default(0)
+  createdAt     DateTime      @default(now())
+  ledgerEntries LedgerEntry[]
+
+  @@unique([assetTypeId, walletType], name: "system_asset_wallet")
+  @@index([walletType])
+}
+
+enum SystemWalletType {
+  TREASURY
+  REVENUE
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique
+  type           TransactionType
+  status         TransactionStatus
+  response       Json?
+  createdAt      DateTime @default(now())
+
+  LedgerEntries LedgerEntry[]
+}
+
+model LedgerEntry {
+  id             String        @id @default(uuid())
+  transactionId  String
+  transaction    Transaction   @relation(fields: [transactionId], references: [id])
+  
+  walletId       String?
+  wallet         Wallet?       @relation(fields: [walletId], references: [id])
+  
+  systemWalletId String?
+  systemWallet   SystemWallet? @relation(fields: [systemWalletId], references: [id])
+  
+  direction      EntryDirection
+  amount         BigInt
+  createdAt      DateTime      @default(now())
+
+  @@index([walletId])
+  @@index([systemWalletId])
+  @@index([transactionId])
+  @@index([createdAt])
+}
+
+enum EntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionType {
+  TOPUP
+  BONUS
+  SPEND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum WalletType {
+  USER
+  TREASURY
+  REVENUE
+}
+
+
